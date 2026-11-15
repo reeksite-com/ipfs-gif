@@ -1,0 +1,81 @@
+{% extends "ui_pages/base.html" %}
+
+{% block page_title %}Moderation Queue{% endblock %}
+
+{% block page_content %}
+<section class="content-section">
+    <div class="content-section__content">
+        {% if reporter_summaries.len() == 0 %}
+        <p>There are no reports to review.</p>
+        {% endif %}
+        {% for summary in reporter_summaries %}
+        <section class="report-summary">
+            <strong>Reporter Public Key:</strong><br>
+            {{ summary.reporter_public_key }}
+            <br><br>
+            <strong>Reporter IP Address:</strong><br>
+            {{ summary.reporter_ip_address }}
+            <br><br>
+            <form action="/moderation-queue/reporter/{{ urlencoding::encode(summary.reporter_public_key) }}/{{ urlencoding::encode(summary.reporter_ip_address) }}/" method="POST">
+                <input name="action" value="reject" type="hidden">
+                <button type="submit">❌ Reporter is a bad actor</button>
+            </form>
+            {% for report_with_claims in summary.reports %}
+            <div class="report-summary__gif">
+                <img
+                    src="{{ ipfs_preview_gateway }}/ipfs/{{ report_with_claims.gif.cid.as_deref().unwrap_or("") }}?filename={{ report_with_claims.gif.filename }}"
+                    alt="{{ report_with_claims.gif.description }}"
+                    style="aspect-ratio: {{ report_with_claims.gif.width }} / {{ report_with_claims.gif.height }}"
+                    loading="lazy"
+                >
+                <aside>
+                    <strong>Report Reason:</strong><br>
+                    {{ report_with_claims.report.report_type }}
+                    <br><br>
+                    {% if report_with_claims.report.report_type == ModerationReportType::Dcma %}
+                    <strong>Copyright Holder Name:</strong><br>
+                    {{ report_with_claims.report.copyright_holder_name }}
+                    <br><br>
+                    <strong>Reporter Name:</strong><br>
+                    {{ report_with_claims.report.reporter_name }}
+                    <br><br>
+                    <strong>Reporter Email:</strong><br>
+                    {{ report_with_claims.report.reporter_email }}
+                    <br><br>
+                    <form action="/moderation-queue/report/{{ report_with_claims.report.id }}" method="POST">
+                        <input name="action" value="accept" type="hidden">
+                        <button type="submit">✅ Dismiss report</button>
+                    </form>
+                    {% else %}
+                    <form action="/moderation-queue/report/{{ report_with_claims.report.id }}" method="POST">
+                        <input name="action" value="accept" type="hidden">
+                        <button type="submit">✅ Report is Correct</button>
+                    </form>
+                    {% endif %}
+                    <form action="/moderation-queue/report/{{ report_with_claims.report.id }}" method="POST">
+                        <input name="action" value="reject" type="hidden">
+                        <button type="submit">❌ Report is Incorrect</button>
+                    </form>
+                    {% if report_with_claims.counter_claims.len() > 0 %}
+                        <h3>Counter Claims</h3>
+                        <ol>
+                        {% for counter_claim in report_with_claims.counter_claims %}
+                            <li>
+                                <strong>Counter Claimant Name:</strong>
+                                {{ counter_claim.counter_claimant_name }}
+                                <br>
+                                <strong>Counter Claimant Email:</strong>
+                                {{ counter_claim.counter_claimant_email }}
+                                <br><br>
+                            </li>
+                        {% endfor %}
+                        </ol>
+                    {% endif %}
+                </aside>
+            </div>
+            {% endfor %}
+        </section>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

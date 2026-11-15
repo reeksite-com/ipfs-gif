@@ -1,0 +1,293 @@
+{% extends "ui_pages/base.html" %}
+
+{% block page_title %}{{ gif.description }} GIF{% endblock %}
+
+{% block page_content %}
+{% if needs_title_update %}
+    <title>{{ gif.description }} GIF | Interplanetary GIFs</title>
+{% endif %}
+<form action="/search/" class="gif-search">
+    <input type="text" name="q" placeholder="Search all GIFs..." autocapitalize="none" autocomplete="off" autocorrect="off">
+    <button type="submit">Search</button>
+</form>
+{% if let Some(already_uploaded_alert) = already_uploaded_alert %}
+    <div class="alert-container">
+        {{ already_uploaded_alert|safe }}
+    </div>
+{% endif %}
+{% if let Some(quarantined_alert) = quarantined_alert %}
+<div id="quarantined-alert" class="alert-container" hidden>
+    {{ quarantined_alert|safe }}
+</div>
+<script>
+    (async () => {
+        const quarantinedAlert = document.getElementById('quarantined-alert');
+        quarantinedAlert.removeAttribute('hidden');
+    })();
+</script>
+{% if gif.quarantine_scan_result == QuarantineScanResult::None %}
+<script>
+    (async () => {
+        let attemptCounter = 0;
+        let attemptWaitTime = 500;
+        while (attemptCounter < 100) {
+            if (!window.location.pathname.startsWith('/gif/{{ gif.quarantine_id }}')) {
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, attemptWaitTime));
+            if (!window.location.pathname.startsWith('/gif/{{ gif.quarantine_id }}')) {
+                break;
+            }
+            try {
+                const response = await fetch('/api/v1/quarantine/{{ gif.quarantine_id }}');
+                if (response.ok) {
+                    const quarantined = await response.json();
+                    if (quarantined.cid) {
+                        window.location.href = `/gif/${quarantined.cid}/`;
+                    } else if (quarantined.status !== 'None') {
+                        await fetch(location.href, {
+                            cache: 'no-store',
+                            headers: { 'Cache-Control': 'no-cache' }
+                        });
+                        window.location.reload();
+                    }
+                } else if (response.status === 404) {
+                    window.location.href = '/404/';
+                    break;
+                }
+            } catch (error) {}
+            attemptWaitTime = Math.min(5000, attemptWaitTime + 500);
+            attemptCounter++;
+        }
+        if (attemptCounter >= 100) {
+            window.location.reload();
+        }
+    })();
+</script>
+{% endif %}
+{% endif %}
+{% if let Some(quarantined_alert_noscript) = quarantined_alert_noscript %}
+<noscript>
+    <div class="alert-container">
+        {{ quarantined_alert_noscript|safe }}
+    </div>
+</noscript>
+{% endif %}
+
+{% if let Some(report_takedown_alert) = report_takedown_alert %}
+<div class="alert-container">
+    {{ report_takedown_alert|safe }}
+    <p>
+        If you think this is a mistake, you can <a href="/counter-claim/{{ cid }}/">Submit a Counter-Notice</a>.
+    </p>
+</div>
+{% else %}
+<section class="gif-detail">
+    <div class="gif-preview" style="--native-width: {{ gif.width }}px; --native-height: {{ gif.height }}px">
+        <div id="gif-preview-spinner" class="gif-preview__spinner"></div>
+        <img id="gif-preview-image" src="{{ gif_img_src }}" alt="{{ gif.description }}">
+    </div>
+    <script>
+        (() => {
+            const gifPreviewImage = document.getElementById('gif-preview-image');
+            const gifPreviewSpinner = document.getElementById('gif-preview-spinner');
+            gifPreviewImage.addEventListener('load', () => {
+                gifPreviewSpinner.setAttribute('hidden', '');
+            });
+        })();
+    </script>
+    {% if quarantined_alert.is_none() %}
+    <span class="gif-actions">
+        <a
+            id="copy-link"
+            hidden
+            href="#"
+        >
+            <span class="bi bi-link" aria-hidden="true"></span>
+            Copy Link
+            <div id="copy-link-tooltip" hidden class="gif-actions__tooltip">
+                Copied!
+            </div>
+        </a>
+        <script>
+            (() => {
+                const copyLink = document.getElementById('copy-link');
+                const copyLinkTooltip = document.getElementById('copy-link-tooltip');
+                let copyLinkTooltipTimeout;
+                copyLink.removeAttribute('hidden');
+                copyLink.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    window.copyLink('{{ ipfs_share_gateway }}/ipfs/{{ cid }}?filename={{ gif.filename }}');
+                    copyLinkTooltip.removeAttribute('hidden');
+                    clearTimeout(copyLinkTooltipTimeout);
+                    copyLinkTooltipTimeout = setTimeout(() => {
+                        copyLinkTooltip.setAttribute('hidden', '');
+                    }, 3000);
+                });
+            })();
+        </script>
+        <a
+            id="download-link"
+            href="{{ gif_img_src }}&download=true"
+            download
+            target="_blank"
+        >
+            <span class="bi bi-download" aria-hidden="true"></span>
+            Download
+        </a>
+        <script>
+            (() => {
+                const downloadLink = document.getElementById('download-link');
+                downloadLink.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    // IPFS gateway appears to respond in a much more stable manner to fetch
+                    // requests rather than letting the browser redirect to the link (times out a lot).
+                    fetch(downloadLink.getAttribute('href')).then((response) => {
+                        response.blob().then((blob) => {
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = '{{ gif.filename }}';
+                            a.rel = 'noopener';
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                        });
+                    }).catch((error) => {
+                        window.open(downloadLink.getAttribute('href'), '_blank');
+                    });
+                });
+            })();
+        </script>
+        <br>
+        <button command="show-modal" commandfor="gif-embed-code">
+            <span class="bi bi-code" aria-hidden="true"></span>
+            Embed
+        </button>
+        <button command="show-modal" commandfor="gif-info">
+            <span class="bi bi-info-circle" aria-hidden="true"></span>
+            Info
+        </button>
+        <a href="/report/{{ cid }}/">
+            <span class="bi bi-flag" aria-hidden="true"></span>
+            Report
+        </a>
+    </span>
+    {% endif %}
+</section>
+{% endif %}
+
+{% block upload_tags %}
+{% if report_takedown_alert.is_none() && (tags.len() > 0 || gif.uploader_public_key.len() > 0) %}
+<form
+    id="upload-tags"
+    action="/gif/{{ cid }}/"
+    method="POST"
+    hx-post="/gif/{{ cid }}"
+    hx-target="#upload-tags"
+    hx-swap="outerHtml"
+>
+    {% if let Some(validation_alert) = validation_alert %}
+        <div class="alert-container">
+            {{ validation_alert|safe }}
+        </div>
+    {% endif %}
+    <section class="tags">
+        <input id="uploader-public-key" type="hidden" value="{{ gif.uploader_public_key }}" aria-hidden="true">
+        <input id="upload-signing-message" type="hidden" value="{{ update_signing_message }}" aria-hidden="true">
+        <input id="upload-signed-message" type="hidden" name="upload-signed-message" value="" aria-hidden="true">
+        {% for (tag_slug, tag) in tags %}
+        <a class="tag" href="/tag/{{ tag_slug }}">
+            {{ tag }}
+            <span
+                class="bi bi-x"
+                hidden
+                hx-post="/gif/{{ cid }}"
+                hx-vals="{&quot;delete-tag-name&quot;:&quot;{{tag}}&quot;}"
+                hx-target="#upload-tags"
+                hx-swap="outerHtml"
+            ></span>
+        </a>
+        {% endfor %}
+        <div id="new-tag-combo-button" hidden class="tags__add-combo-button">
+            <input id="new-tag-name-input" name="new-tag-name" placeholder="Type a tag name..." aria-label="Enter a new tag name" autocomplete="off" autocapitalize="off">
+            <button
+                id="new-tag-submit-button"
+                type="submit"
+                aria-label="Add tag"
+            >
+                <span class="bi bi-plus"></span>
+            </button>
+        </div>
+        <script>
+            (async () => {
+                const uploaderPublicKey = document.getElementById('uploader-public-key').value;
+                if (uploaderPublicKey !== await window.getPublicSigningKey()) return;
+
+                const newTagComboButton = document.getElementById('new-tag-combo-button');
+                newTagComboButton.removeAttribute('hidden');
+
+                const uploadTags = document.getElementById('upload-tags');
+                uploadTags.querySelectorAll('.tag .bi-x').forEach((element) => {
+                    element.removeAttribute('hidden');
+                });
+
+                uploadTags.addEventListener('click', (e) => {
+                    const tagClose = e.target?.closest('.bi-x');
+                    if (tagClose) {
+                        e.preventDefault();
+
+                    }
+                }, true);
+
+                document.getElementById('upload-signed-message').value = await window.signMessage(
+                    document.getElementById('upload-signing-message').value
+                );
+            })();
+        </script>
+    </section>
+</form>
+{% endif %}
+{% endblock %}
+
+<dialog id="gif-embed-code">
+    <button class="dialog__close" commandfor="gif-embed-code" command="close">Close</button>
+    <h2>Embed this GIF</h2>
+    <p>Use this embed code to add this GIF to your website or blog!</p>
+    <div class="form-control">
+        <textarea aria-label="GIF Embed Code" maxlength="30" rows="4"><img src="{{ ipfs_share_gateway }}/ipfs/{{ cid }}?filename={{ gif.filename }}"></textarea>
+    </div>
+</dialog>
+
+<dialog id="gif-info" style="width: 30rem">
+    <button class="dialog__close" commandfor="gif-info" command="close">Close</button>
+    <h2>GIF Info</h2>
+    <div class="description-group">
+        <dl>
+            <dt>Upload Date</dt>
+            <dd>
+                <time
+                    datetime="{{ gif.upload_time.and_utc().to_rfc3339() }}"
+                    data-is="timestamp"
+                    data-datetime-format="date"
+                >{{ gif.upload_time }}</time>
+            </dd>
+            <dt>Dimensions</dt>
+            <dd>
+                {{ gif.width }} x {{ gif.height }} px
+            </dd>
+        </dl>
+        <dl>
+            <dt>Frames</dt>
+            <dd>
+                {{ gif.frames }}
+            </dd>
+            <dt>Size</dt>
+            <dd>
+                {{ size::Size::from_bytes(gif.size.clone()) }}
+            </dd>
+        </dl>
+    </div>
+</dialog>
+{% endblock %}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>{% block page_title %}{% endblock %} | Interplanetary GIFs</title>
+        <meta name="description" content="Send GIFs to other planets! Upload and embed gifs in social media and chat apps.">
+        <meta name="keywords" content="gifs, memes, animated, upload, hosting">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" href="/assets/images/site/favicon.ico">
+        <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/site/favicon/apple-touch-icon.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/site/favicon/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/site/favicon/favicon-16x16.png">
+        <link rel="manifest" href="/assets/site.webmanifest">
+        <link href="/assets/css/main.css?version=1.2" type="text/css" rel="preload" as="style">
+        <link href="/assets/css/main.css?version=1.2" type="text/css" rel="stylesheet">
+        <link href="/assets/css/bootstrap-icons.min.css" type="text/css" rel="preload" as="style">
+        <link href="/assets/css/bootstrap-icons.min.css" type="text/css" rel="stylesheet">
+        <meta
+            name="htmx-config"
+            content='{
+                "responseHandling": [
+                    { "code": "204", "swap": false },
+                    { "code": "429", "swap": false, "error": true },
+                    { "code": "[23]..", "swap": true },
+                    { "code": "[45]..", "swap": true, "error": true },
+                    { "code": "...", "swap": true }
+                ]
+            }'
+        />
+        <script src="/assets/js/crypto.js?version=1.0"></script>
+        <script defer src="/assets/js/htmx.min.js"></script>
+        <script defer src="/assets/js/main.js?version=1.1"></script>
+        {% block page_head %}{% endblock %}
+    </head>
+    <body>
+        {% block site_header %}
+            <header class="header">
+                <div class="header__logo">
+                    <a href="/" hx-get="/" hx-target="#main-article" hx-push-url="true">
+                        <img src="/assets/images/site/logo.png" alt="Interplanetary GIFs!">
+                    </a>
+                </div>
+                <nav hx-target="#main-article" hx-push-url="true" hx-swap="innerHtml show:window:top">
+                    <a href="/explore/" hx-get="/explore/">Explore</a>
+                    <a href="/trending/" hx-get="/trending/">Trending</a>
+                    <a href="/upload/" hx-get="/upload/">Upload</a>
+                </nav>
+            </header>
+        {% endblock %}
+        <main class="main">
+            <article id="main-article" class="main__article">
+                {% block page_content %}{% endblock %}
+            </article>
+        </main>
+        {% block site_footer %}
+            <footer class="footer" hx-target="#main-article" hx-push-url="true" hx-swap="innerHtml show:window:top">
+                <a href="/terms-of-service/" hx-get="/terms-of-service/">Terms</a> &#8729;
+                <a href="/privacy-policy/" hx-get="/privacy-policy/">Privacy</a> &#8729;
+                <a href="/api/" hx-get="/api/">API</a> &#8729;
+                <a href="/dcma/" hx-get="/dcma/">DCMA</a>
+            </footer>
+        {% endblock %}
+    </body>
+</html>

@@ -1,0 +1,53 @@
+{% extends "ui_pages/base.html" %}
+
+{% block page_title %}Authenticate{% endblock %}
+
+{% block page_content %}
+{% if let Some(validation_alert) = validation_alert %}
+    <div class="alert-container">
+        {{ validation_alert|safe }}
+    </div>
+{% else %}
+<section class="content-section">
+    <div class="content-section__content">
+        <noscript>
+            This page does not work without Javascript. Please enable it to continue.
+        </noscript>
+        <form id="authenticate-form" action="/authenticate/" method="POST" hidden>
+            <p>You are automatically being redirected. Please wait.</p>
+            <input id="authenticate-public-key" type="hidden" name="authenticate-public-key" value="{{ authenticate_public_key }}" aria-hidden="true">
+            <input id="authenticate-signing-message" type="hidden" value="{{ authenticate_signing_message }}" aria-hidden="true">
+            <input id="authenticate-signed-message" type="hidden" name="authenticate-signed-message" value="" aria-hidden="true">
+            <input type="hidden" name="redirect-to" value="{{ redirect_to }}" aria-hidden="true" />
+            <button type="submit" hidden>Submit</button>
+        </form>
+        <script>
+            (async () => {
+                const authenticateForm = document.getElementById('authenticate-form');
+                authenticateForm.removeAttribute('hidden');
+
+                const publicKey = document.getElementById('authenticate-public-key');
+                const signingMessage = document.getElementById('authenticate-signing-message');
+                const signedMessage = document.getElementById('authenticate-signed-message');
+
+                if (!publicKey.value.trim()) {
+                    publicKey.value = await window.getPublicSigningKey();
+                    authenticateForm.submit();
+                } else {
+                    // Prevent infinite redirection if authentication goes wrong (like blocked cookies)
+                    if (new Date().getTime() - parseInt(sessionStorage.getItem('lastAuthTime') || '0') < 5000) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    sessionStorage.setItem('lastAuthTime', new Date().getTime());
+                    signedMessage.value = await window.signMessage(
+                        signingMessage.value
+                    );
+                    authenticateForm.submit();
+                }
+            })();
+        </script>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
